@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useAuthStore } from '../../stores/useAuthStore'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { setUser } = useAuth()
+  const { setAuth } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -22,7 +22,7 @@ export function LoginPage() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username: email, password }),
       })
 
       if (!response.ok) {
@@ -30,8 +30,7 @@ export function LoginPage() {
       }
 
       const data = await response.json()
-      localStorage.setItem('user', JSON.stringify(data.user))
-      setUser(data.user)
+      setAuth(data.user, data.access_token)
       navigate(from, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión')

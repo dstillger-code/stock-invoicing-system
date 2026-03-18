@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
 import { PrivateRoute } from './components/PrivateRoute'
 import { Sidebar } from './components/Sidebar'
 import { AuthLayout } from './components/auth/AuthLayout'
@@ -22,20 +21,18 @@ function AppLayout() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        <Route path="/auth/*" element={<AuthLayout />} />
-        <Route
-          path="/*"
-          element={
-            <PrivateRoute>
-              <AppLayout />
-            </PrivateRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/stock" replace />} />
-      </Routes>
-    </AuthProvider>
+    <Routes>
+      <Route path="/auth/*" element={<AuthLayout />} />
+      <Route
+        path="/*"
+        element={
+          <PrivateRoute>
+            <AppLayout />
+          </PrivateRoute>
+        }
+      />
+      <Route path="/" element={<Navigate to="/stock" replace />} />
+    </Routes>
   )
 }
 
