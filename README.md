@@ -77,6 +77,7 @@ stock-invoicing-system/
 │   │       ├── config.py   # Settings (Pydantic)
 │   │       ├── database.py # Async SQLAlchemy
 │   │       └── base.py     # Base model
+│   ├── tests/              # Tests pytest
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -90,10 +91,13 @@ stock-invoicing-system/
 │   │   ├── store/          # Zustand stores
 │   │   │   ├── useAuthStore.ts
 │   │   │   └── useConfigStore.ts
-│   │   ├── App.tsx
-│   │   └── main.tsx
+│   │   └── test/           # Tests Vitest
 │   └── package.json
-├── docker-compose.yml
+├── docker/
+│   └── nginx.conf          # Configuración nginx
+├── Dockerfile.backend      # Dockerfile FastAPI
+├── Dockerfile.frontend    # Dockerfile React
+├── docker-compose.yml     # Orquestación completa
 └── README.md
 ```
 
@@ -142,12 +146,52 @@ cd frontend
 npm install
 ```
 
-### 4. Base de datos con Docker
+### 4. Base de datos con Docker (solo PostgreSQL)
 
 ```bash
 # En la raíz del proyecto
 docker compose up -d
 ```
+
+---
+
+## Docker (Completo)
+
+### Servicios Disponibles
+
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| postgres | 5432 | Base de datos PostgreSQL |
+| backend | 8000 | API FastAPI |
+| frontend | 80 | Aplicación React (nginx) |
+
+### Ejecución Completa
+
+```bash
+# Levantar todos los servicios
+docker compose up -d --build
+
+# Ver logs
+docker compose logs -f
+
+# Detener servicios
+docker compose down
+```
+
+### Variables de Entorno
+
+```bash
+SECRET_KEY=tu-secret-key-aqui
+```
+
+### URLs
+
+| Servicio | URL |
+|----------|-----|
+| Frontend | http://localhost |
+| Backend API | http://localhost:8000 |
+| Swagger Docs | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
 
 ---
 
