@@ -33,7 +33,7 @@ export function Sidebar() {
         <h1 className="text-xl font-bold">Stock & Facturación</h1>
         <p className="text-sm text-slate-400 mt-1">{user?.full_name || user?.email}</p>
         <span className="inline-block mt-1 px-2 py-0.5 bg-slate-700 rounded text-xs">
-          {user?.rol || 'usuario'}
+          {user?.role || 'operator'}
         </span>
       </div>
 

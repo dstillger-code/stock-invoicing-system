@@ -2,6 +2,6 @@
 from .auth import User
 from .stock import StockItem
 from .invoicing import TaxConfig
-from .negocio import Producto, PrecioPorRegion
+from .business import Country, Product, ProductPrice, Inventory
 
-__all__ = ["User", "StockItem", "TaxConfig", "Producto", "PrecioPorRegion"]
+__all__ = ["User", "StockItem", "TaxConfig", "Country", "Product", "ProductPrice", "Inventory"]

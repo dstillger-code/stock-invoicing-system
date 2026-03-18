@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export interface User {
-  id: number
+  id: string
   email: string
   full_name: string | null
-  rol: string
-  permisos_modulos: string[]
+  role: string
+  allowed_modules: string[]
 }
 
 interface AuthState {
@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (module) => {
         const { user } = get()
         if (!user) return false
-        return user.permisos_modulos.includes(module)
+        return user.allowed_modules.includes(module)
       },
 
       get isAuthenticated() {

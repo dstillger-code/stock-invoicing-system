@@ -34,7 +34,7 @@ async def login(
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
     if not user.is_active:
@@ -44,11 +44,11 @@ async def login(
         "access_token": user.email,
         "token_type": "bearer",
         "user": {
-            "id": user.id,
+            "id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
-            "rol": user.rol,
-            "permisos_modulos": user.permisos_modulos or [],
+            "role": user.role,
+            "allowed_modules": user.allowed_modules or [],
         },
     }
 
@@ -58,8 +58,8 @@ async def register(
     email: str,
     password: str,
     full_name: str | None = None,
-    rol: str = "usuario",
-    permisos_modulos: list[str] = ["stock", "invoicing", "negocio"],
+    role: str = "operator",
+    allowed_modules: list[str] = ["stock"],
     db: AsyncSession = Depends(get_db),
 ):
     """Registro de nuevo usuario (para desarrollo)."""
@@ -70,19 +70,19 @@ async def register(
     hashed_password = get_password_hash(password)
     new_user = User(
         email=email,
-        hashed_password=hashed_password,
+        password_hash=hashed_password,
         full_name=full_name,
-        rol=rol,
-        permisos_modulos=permisos_modulos,
+        role=role,
+        allowed_modules=allowed_modules,
     )
     db.add(new_user)
     await db.flush()
     await db.refresh(new_user)
 
     return {
-        "id": new_user.id,
+        "id": str(new_user.id),
         "email": new_user.email,
         "full_name": new_user.full_name,
-        "rol": new_user.rol,
-        "permisos_modulos": new_user.permisos_modulos,
+        "role": new_user.role,
+        "allowed_modules": new_user.allowed_modules,
     }

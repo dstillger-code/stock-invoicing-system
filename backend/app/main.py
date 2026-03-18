@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db, create_all_tables
 from app.core.base import Base
-from app.routers import auth, stock, invoicing, negocio
+from app.routers import auth, stock, invoicing, business
 from app.db.seed_tax_config import seed_tax_config
 
 # Importar modelos para que Base.metadata tenga todas las tablas
@@ -43,7 +43,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(stock.router, prefix="/api")
 app.include_router(invoicing.router, prefix="/api")
-app.include_router(negocio.router, prefix="/api")
+app.include_router(business.router, prefix="/api")
 
 
 @app.get("/")
