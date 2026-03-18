@@ -7,11 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db, create_all_tables
 from app.core.base import Base
-from app.routers import auth, stock, invoicing, business
-from app.db.seed_tax_config import seed_tax_config
-
-# Importar modelos para que Base.metadata tenga todas las tablas
-from app import models  # noqa: F401
+from app.auth.router import router as auth_router
+from app.stock.router import router as stock_router
+from app.billing.router import router as billing_router
+from app.auth.seed import seed_tax_config
 
 
 @asynccontextmanager
@@ -21,7 +20,6 @@ async def lifespan(app: FastAPI):
     await create_all_tables(Base)
     await seed_tax_config()
     yield
-    # shutdown si hiciera falta (ej. cerrar pool)
 
 
 app = FastAPI(
@@ -39,11 +37,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers por módulo (Auth, Stock, Facturación)
-app.include_router(auth.router, prefix="/api")
-app.include_router(stock.router, prefix="/api")
-app.include_router(invoicing.router, prefix="/api")
-app.include_router(business.router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+app.include_router(stock_router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
 
 
 @app.get("/")

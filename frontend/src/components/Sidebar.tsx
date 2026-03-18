@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { useAuthStore } from '../stores/useAuthStore'
-import { useConfigStore } from '../stores/useConfigStore'
+import { useAuthStore } from '../store/useAuthStore'
+import { useConfigStore } from '../store/useConfigStore'
 
 interface NavItem {
   path: string

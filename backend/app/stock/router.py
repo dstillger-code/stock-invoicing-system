@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.stock import StockItem
-from app.schemas.stock import StockItemCreate, StockItemUpdate, StockItemResponse
+from app.stock.model import StockItem
+from app.stock.schema import StockItemCreate, StockItemUpdate, StockItemResponse
 
 router = APIRouter(prefix="/stock", tags=["Stock"])
 

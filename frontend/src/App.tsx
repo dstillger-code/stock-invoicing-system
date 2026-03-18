@@ -1,9 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { PrivateRoute } from './components/PrivateRoute'
+import { PrivateRoute } from './components/ui/PrivateRoute'
 import { Sidebar } from './components/Sidebar'
-import { AuthLayout } from './components/auth/AuthLayout'
-import { StockLayout } from './components/stock/StockLayout'
-import { InvoicingLayout } from './components/invoicing/InvoicingLayout'
+import { AuthLayout } from './modules/Auth/AuthLayout'
+import { StockLayout } from './modules/Stock/StockLayout'
+import { BillingLayout } from './modules/Billing/BillingLayout'
 
 function AppLayout() {
   return (
@@ -12,7 +12,7 @@ function AppLayout() {
       <main className="flex-1 p-6">
         <Routes>
           <Route path="/stock/*" element={<StockLayout />} />
-          <Route path="/invoicing/*" element={<InvoicingLayout />} />
+          <Route path="/billing/*" element={<BillingLayout />} />
         </Routes>
       </main>
     </div>
