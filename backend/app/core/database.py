@@ -35,9 +35,9 @@ async def get_db():
 
 
 async def init_db():
-    """Crea los esquemas si no existen (auth, stock, invoicing)."""
+    """Crea los esquemas si no existen (auth, stock, invoicing, negocio)."""
     async with engine.begin() as conn:
-        for schema in ("auth", "stock", "invoicing"):
+        for schema in ("auth", "stock", "invoicing", "negocio"):
             await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
 
 
