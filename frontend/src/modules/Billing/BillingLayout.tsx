@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
+import { BillingPage } from './BillingPage'
 
-export function InvoicingLayout() {
+export function BillingLayout() {
   return (
     <div className="mx-auto max-w-6xl p-6">
       <header className="mb-6 border-b border-slate-200 pb-4">
@@ -8,7 +9,7 @@ export function InvoicingLayout() {
       </header>
       <main>
         <Routes>
-          <Route index element={<div className="text-slate-600">Módulo Facturación (impuestos por país, Strategy). Configuración Chile 19% y estructura Argentina lista.</div>} />
+          <Route index element={<BillingPage />} />
         </Routes>
       </main>
     </div>

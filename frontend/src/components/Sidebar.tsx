@@ -10,8 +10,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '/stock', label: 'Stock', module: 'stock' },
-  { path: '/invoicing', label: 'Facturación', module: 'invoicing' },
-  { path: '/negocio', label: 'Negocios', module: 'negocio' },
+  { path: '/billing', label: 'Facturación', module: 'billing' },
 ]
 
 export function Sidebar() {

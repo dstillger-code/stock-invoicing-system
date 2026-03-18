@@ -17,7 +17,7 @@ interface AuthState {
   setAuth: (user: User, token: string) => void
   logout: () => void
   hasPermission: (module: string) => boolean
-  isAuthenticated: boolean
+  isAuthenticated: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -48,8 +48,9 @@ export const useAuthStore = create<AuthState>()(
         return user.allowed_modules.includes(module)
       },
 
-      get isAuthenticated() {
-        return get().user !== null
+      isAuthenticated: () => {
+        const { user, token } = get()
+        return user !== null && token !== null
       },
     }),
     {
@@ -61,3 +62,8 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+export const getAuthHeader = () => {
+  const token = useAuthStore.getState().token
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}

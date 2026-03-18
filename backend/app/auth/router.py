@@ -1,15 +1,21 @@
 """Router de autenticación (esquema auth)."""
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.auth.model import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -20,9 +26,40 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token inválido o expirado",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Usuario desactivado")
+    return user
+
+
 @router.get("/health")
 async def auth_health():
-    """Health check del módulo Auth."""
     return {"module": "auth", "status": "ok"}
 
 
@@ -30,7 +67,6 @@ async def auth_health():
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
 ):
-    """Inicio de sesión - retorna usuario con permisos."""
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
 
@@ -40,8 +76,16 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Usuario desactivado")
 
+    access_token = create_access_token(
+        data={
+            "sub": user.email,
+            "role": user.role,
+            "allowed_modules": user.allowed_modules or [],
+        }
+    )
+
     return {
-        "access_token": user.email,
+        "access_token": access_token,
         "token_type": "bearer",
         "user": {
             "id": str(user.id),
@@ -62,7 +106,6 @@ async def register(
     allowed_modules: list[str] = ["stock"],
     db: AsyncSession = Depends(get_db),
 ):
-    """Registro de nuevo usuario (para desarrollo)."""
     result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="El email ya está registrado")

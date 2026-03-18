@@ -7,10 +7,10 @@ interface PrivateRouteProps {
 }
 
 export function PrivateRoute({ children, module }: PrivateRouteProps) {
-  const { user, hasPermission } = useAuthStore()
+  const { user, hasPermission, isAuthenticated } = useAuthStore()
   const location = useLocation()
 
-  if (!user) {
+  if (!isAuthenticated()) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />
   }
 

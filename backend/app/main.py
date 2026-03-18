@@ -9,6 +9,7 @@ from app.core.database import init_db, create_all_tables
 from app.core.base import Base
 from app.auth.router import router as auth_router
 from app.stock.router import router as stock_router
+from app.stock.inventory import router as inventory_router
 from app.billing.router import router as billing_router
 from app.auth.seed import seed_tax_config
 
@@ -39,6 +40,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(stock_router, prefix="/api")
+app.include_router(inventory_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
 
 
