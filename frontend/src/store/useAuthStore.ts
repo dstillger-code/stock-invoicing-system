@@ -63,7 +63,7 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-export const getAuthHeader = () => {
+export const getAuthHeader = (): Record<string, string> => {
   const token = useAuthStore.getState().token
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
