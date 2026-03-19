@@ -1,5 +1,5 @@
 """Modelos del esquema auth (usuarios, sesiones)."""
-from sqlalchemy import Column, String, Boolean, DateTime, ARRAY
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -20,4 +20,6 @@ class User(Base):
     role = Column(String(50), default="operator", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     allowed_modules = Column(ARRAY(String), default=["stock"], nullable=False)
+    password_changed = Column(Boolean, default=False, nullable=False)
+    expiration_days = Column(Integer, default=30, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
