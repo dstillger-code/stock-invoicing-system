@@ -11,15 +11,15 @@ from app.auth.router import router as auth_router
 from app.stock.router import router as stock_router
 from app.stock.inventory import router as inventory_router
 from app.billing.router import router as billing_router
-from app.auth.seed import seed_tax_config
+from app.auth.seed import seed_all
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicialización: esquemas, tablas y seed de países (CL, AR)."""
+    """Inicialización: esquemas, tablas, países y usuario admin."""
     await init_db()
     await create_all_tables(Base)
-    await seed_tax_config()
+    await seed_all()
     yield
 
 
