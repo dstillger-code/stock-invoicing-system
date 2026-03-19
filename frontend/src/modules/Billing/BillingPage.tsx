@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAuthHeader } from '../../store/useAuthStore'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 interface BillingProduct {
   id: string
@@ -54,6 +56,7 @@ export function BillingPage() {
   const [error, setError] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<InvoiceResponse | null>(null)
   const [generating, setGenerating] = useState(false)
+  const invoiceRef = useRef<HTMLDivElement>(null)
 
   const [documentType, setDocumentType] = useState('factura')
   const [taxType, setTaxType] = useState<string>('')
@@ -187,6 +190,121 @@ export function BillingPage() {
     }
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleExportPDF = () => {
+    if (!invoice) return
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const countryName = invoice.country_code === 'CL' ? 'Chile' : 'Argentina'
+    const currencyName = invoice.currency === 'CLP' ? 'Peso Chileno' : 'Peso Argentino'
+    const docTypeLabel = invoice.document_type === 'factura' ? 'FACTURA' : 'BOLETA'
+
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text(docTypeLabel, pageWidth / 2, 20, { align: 'center' })
+
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`N° ${invoice.document_number}`, pageWidth / 2, 28, { align: 'center' })
+
+    doc.setFontSize(10)
+    const leftCol = 14
+    doc.text(`País: ${countryName}`, leftCol, 45)
+    doc.text(`Emisor: ${invoice.issuer_name}`, leftCol, 52)
+    doc.text(`Fecha: ${new Date(invoice.issued_at).toLocaleString('es-CL')}`, leftCol, 59)
+    doc.text(`Moneda: ${currencyName} (${invoice.currency})`, leftCol, 66)
+    doc.text(`Tipo IVA: ${invoice.tax_rate}%${invoice.tax_type ? ` (${invoice.tax_type})` : ''}`, leftCol, 73)
+
+    autoTable(doc, {
+      startY: 80,
+      head: [['Producto / SKU', 'Cantidad', 'P. Unit.', 'Neto', `IVA ${invoice.tax_rate}%`, 'Total']],
+      body: invoice.items.map((item) => [
+        `${item.name}\n(${item.sku})`,
+        item.quantity.toString(),
+        `$${item.unit_price.toFixed(2)}`,
+        `$${item.net_amount.toFixed(2)}`,
+        `$${item.tax_amount.toFixed(2)}`,
+        `$${item.total.toFixed(2)}`,
+      ]),
+      foot: [
+        ['', '', '', 'Subtotal:', `$${invoice.subtotal.toFixed(2)}`],
+        ['', '', '', `IVA (${invoice.tax_rate}%):`, `$${invoice.tax_amount.toFixed(2)}`],
+        ['', '', '', 'TOTAL:', `$${invoice.total.toFixed(2)}`],
+      ],
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 20, halign: 'center' },
+        2: { cellWidth: 25, halign: 'right' },
+        3: { cellWidth: 25, halign: 'right' },
+        4: { cellWidth: 25, halign: 'right' },
+        5: { cellWidth: 30, halign: 'right' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'foot' && data.column.index >= 3) {
+          data.cell.styles.halign = 'right'
+        }
+      },
+    })
+
+    doc.save(`${invoice.document_number}.pdf`)
+  }
+
+  const handleExportCSV = () => {
+    if (!invoice) return
+    const separator = ','
+    const lines: string[] = []
+
+    lines.push(`\uFEFF"${docHeader('Factura')} - ${invoice.document_number}"`)
+    lines.push(`"${docHeader('Pais')}",${invoice.country_name}`)
+    lines.push(`"${docHeader('Emisor')}",${escapeCSV(invoice.issuer_name)}`)
+    lines.push(`"${docHeader('Fecha')}",${new Date(invoice.issued_at).toLocaleString('es-CL')}`)
+    lines.push(`"${docHeader('Moneda')}",${invoice.currency}`)
+    lines.push(`"${docHeader('Tipo IVA')}",${invoice.tax_rate}%${invoice.tax_type ? ` (${invoice.tax_type})` : ''}`)
+    lines.push('')
+    lines.push(`"${docHeader('Producto / SKU')}","${docHeader('Cantidad')}","${docHeader('P. Unit.')}","${docHeader('Neto')}","${docHeader(`IVA ${invoice.tax_rate}%`)}","${docHeader('Total')}"`)
+
+    for (const item of invoice.items) {
+      lines.push(
+        `"${escapeCSV(item.name)} (${escapeCSV(item.sku)})"${separator}` +
+        `${item.quantity}${separator}` +
+        `${item.unit_price.toFixed(2)}${separator}` +
+        `${item.net_amount.toFixed(2)}${separator}` +
+        `${item.tax_amount.toFixed(2)}${separator}` +
+        `${item.total.toFixed(2)}`
+      )
+    }
+
+    lines.push('')
+    lines.push(`"${docHeader('Subtotal')}",,,,${invoice.subtotal.toFixed(2)}`)
+    lines.push(`"${docHeader(`IVA (${invoice.tax_rate}%)`)}",,,,${invoice.tax_amount.toFixed(2)}`)
+    lines.push(`"${docHeader('TOTAL')}",,,,${invoice.total.toFixed(2)}`)
+
+    const csv = lines.join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${invoice.document_number}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  function escapeCSV(value: string): string {
+    return value.replace(/"/g, '""')
+  }
+
+  function docHeader(label: string): string {
+    return label
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -219,7 +337,7 @@ export function BillingPage() {
       )}
 
       {invoice ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 invoice-print-area" ref={invoiceRef}>
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-xl font-bold">
@@ -227,12 +345,41 @@ export function BillingPage() {
               </h3>
               <p className="text-sm text-slate-500">N° {invoice.document_number}</p>
             </div>
-            <button
-              onClick={() => setInvoice(null)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Nueva Venta
-            </button>
+            <div className="flex gap-2 flex-wrap print:hidden">
+              <button
+                onClick={handleExportPDF}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                PDF
+              </button>
+              <button
+                onClick={handleExportCSV}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV
+              </button>
+              <button
+                onClick={handlePrint}
+                className="px-3 py-1.5 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Imprimir
+              </button>
+              <button
+                onClick={() => setInvoice(null)}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Nueva Venta
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
