@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { getAuthHeader } from '../../store/useAuthStore'
-import { useConfigStore } from '../../store/useConfigStore'
 
 interface BillingProduct {
   id: string
@@ -55,8 +54,6 @@ export function BillingPage() {
   const [error, setError] = useState<string | null>(null)
   const [invoice, setInvoice] = useState<InvoiceResponse | null>(null)
   const [generating, setGenerating] = useState(false)
-
-  const { country } = useConfigStore()
 
   const [documentType, setDocumentType] = useState('factura')
   const [taxType, setTaxType] = useState<string>('')
@@ -137,6 +134,7 @@ export function BillingPage() {
 
   const getTaxRate = () => {
     if (!taxRates) return 0
+    const country = taxRates.country_code
     if (country === 'CL') return taxRates.rates.default
     if (country === 'AR') {
       if (documentType === 'boleta') return 0
@@ -164,7 +162,7 @@ export function BillingPage() {
         document_type: documentType,
         items: cartItems,
       }
-      if (country === 'AR' && taxType) {
+      if (taxRates?.country_code === 'AR' && taxType) {
         body.tax_type = taxType
       }
 
@@ -203,7 +201,7 @@ export function BillingPage() {
         <div>
           <h2 className="text-2xl font-bold">Facturación</h2>
           <p className="text-sm text-slate-500 mt-1">
-            {country === 'CL' ? 'Chile' : 'Argentina'} · IVA: {getTaxRate()}%
+            {taxRates?.country_code === 'CL' ? 'Chile' : 'Argentina'} · IVA: {getTaxRate()}%
           </p>
         </div>
         <button
@@ -458,7 +456,7 @@ export function BillingPage() {
               </select>
             </div>
 
-            {country === 'AR' && documentType === 'factura' && (
+            {taxRates?.country_code === 'AR' && documentType === 'factura' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Tipo de IVA

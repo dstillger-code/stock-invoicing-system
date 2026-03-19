@@ -23,10 +23,24 @@ export function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<BillingProduct | null>(null)
   const [inventoryProduct, setInventoryProduct] = useState<BillingProduct | null>(null)
   const [saving, setSaving] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [searchCategory, setSearchCategory] = useState('')
   const { isAdmin, isAccountant } = useAuthStore()
 
   const canEdit = isAccountant()
   const canDelete = isAdmin()
+
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))] as string[]
+
+  const filteredProducts = products.filter((p) => {
+    const matchesText =
+      !searchText ||
+      p.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchText.toLowerCase())
+    const matchesCategory =
+      !searchCategory || (p.category || '').toLowerCase().includes(searchCategory.toLowerCase())
+    return matchesText && matchesCategory
+  })
 
   const [formData, setFormData] = useState({
     sku: '',
@@ -196,7 +210,7 @@ export function ProductsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">Productos</h2>
         {canEdit && (
           <button
@@ -214,6 +228,28 @@ export function ProductsPage() {
         </div>
       )}
 
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por nombre o SKU..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm"
+        />
+        <select
+          value={searchCategory}
+          onChange={(e) => setSearchCategory(e.target.value)}
+          className="rounded border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Todas las categorías</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat || ''}>
+              {cat}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
@@ -228,7 +264,7 @@ export function ProductsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {products.map((product) => (
+            {filteredProducts.map((product) => (
               <tr key={product.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-mono">{product.sku}</td>
                 <td className="px-4 py-3 text-sm font-medium">{product.name}</td>
@@ -308,8 +344,12 @@ export function ProductsPage() {
             ))}
           </tbody>
         </table>
-        {products.length === 0 && (
-          <p className="p-6 text-center text-slate-500">No hay productos registrados.</p>
+        {filteredProducts.length === 0 && (
+          <p className="p-6 text-center text-slate-500">
+            {products.length === 0
+              ? 'No hay productos registrados.'
+              : 'No hay productos que coincidan con la búsqueda.'}
+          </p>
         )}
       </div>
 
