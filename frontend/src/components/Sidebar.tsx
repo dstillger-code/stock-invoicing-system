@@ -6,6 +6,7 @@ interface NavItem {
   path: string
   label: string
   module?: string
+  adminOnly?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -13,8 +14,12 @@ const navItems: NavItem[] = [
   { path: '/billing', label: 'Facturación', module: 'billing' },
 ]
 
+const adminNavItems: NavItem[] = [
+  { path: '/admin/users', label: 'Usuarios', adminOnly: true },
+]
+
 export function Sidebar() {
-  const { user, hasPermission, logout } = useAuthStore()
+  const { user, hasPermission, isAdmin, logout } = useAuthStore()
   const { country, taxRateName, setCountry } = useConfigStore()
 
   const handleCountryToggle = () => {
@@ -68,6 +73,27 @@ export function Sidebar() {
             </NavLink>
           )
         })}
+
+        {isAdmin() && (
+          <>
+            <div className="border-t border-slate-600 my-2" />
+            {adminNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `block px-4 py-2 rounded transition ${
+                    isActive
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-700'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </>
+        )}
       </nav>
 
       <div className="mt-auto">

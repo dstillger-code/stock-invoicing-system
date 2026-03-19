@@ -21,17 +21,23 @@ export function LoginPage() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email, password }),
       })
 
       if (!response.ok) {
-        throw new Error('Credenciales inválidas')
+        const data = await response.json()
+        throw new Error(data.detail || 'Credenciales inválidas')
       }
 
       const data = await response.json()
       setAuth(data.user, data.access_token)
-      navigate(from, { replace: true })
+
+      if (data.user.password_changed === false) {
+        navigate('/change-password', { replace: true })
+      } else {
+        navigate(from, { replace: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
     } finally {

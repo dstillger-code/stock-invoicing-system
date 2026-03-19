@@ -4,6 +4,18 @@ import { Sidebar } from './components/Sidebar'
 import { AuthLayout } from './modules/Auth/AuthLayout'
 import { StockLayout } from './modules/Stock/StockLayout'
 import { BillingLayout } from './modules/Billing/BillingLayout'
+import { AdminLayout } from './modules/Admin/AdminLayout'
+import { ChangePasswordPage } from './modules/Auth/ChangePasswordPage'
+import { useAuthStore } from './store/useAuthStore'
+
+function RequirePasswordChange() {
+  const { mustChangePassword } = useAuthStore()
+  
+  if (mustChangePassword()) {
+    return <ChangePasswordPage />
+  }
+  return <Navigate to="/" replace />
+}
 
 function AppLayout() {
   return (
@@ -13,6 +25,7 @@ function AppLayout() {
         <Routes>
           <Route path="/stock/*" element={<StockLayout />} />
           <Route path="/billing/*" element={<BillingLayout />} />
+          <Route path="/admin/*" element={<AdminLayout />} />
         </Routes>
       </main>
     </div>
@@ -23,6 +36,10 @@ function App() {
   return (
     <Routes>
       <Route path="/auth/*" element={<AuthLayout />} />
+      <Route
+        path="/change-password"
+        element={<RequirePasswordChange />}
+      />
       <Route
         path="/*"
         element={

@@ -7,6 +7,7 @@ export interface User {
   full_name: string | null
   role: string
   allowed_modules: string[]
+  password_changed: boolean
 }
 
 interface AuthState {
@@ -18,6 +19,8 @@ interface AuthState {
   logout: () => void
   hasPermission: (module: string) => boolean
   isAuthenticated: () => boolean
+  isAdmin: () => boolean
+  mustChangePassword: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -51,6 +54,16 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: () => {
         const { user, token } = get()
         return user !== null && token !== null
+      },
+
+      isAdmin: () => {
+        const { user } = get()
+        return user?.email === 'admin@stock.com'
+      },
+
+      mustChangePassword: () => {
+        const { user } = get()
+        return user?.password_changed === false
       },
     }),
     {
