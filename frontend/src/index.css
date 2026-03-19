@@ -14,12 +14,30 @@
 
   .invoice-print-area {
     position: absolute;
-    left: 20px;
-    top: 10px;
+    left: 0;
+    top: 0;
     width: 100%;
+    padding: 20px;
   }
 
-  .invoice-print-area {
-    background: white;
+  .invoice-print-area h3 {
+    font-size: 14pt !important;
+  }
+
+  .invoice-print-area table {
+    font-size: 8pt !important;
+  }
+
+  .invoice-print-area table th,
+  .invoice-print-area table td {
+    padding: 3px 4px !important;
+  }
+
+  .invoice-print-area .grid {
+    font-size: 8pt !important;
+  }
+
+  .invoice-print-area .flex.gap-2 {
+    display: none !important;
   }
 }
