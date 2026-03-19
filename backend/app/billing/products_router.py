@@ -56,7 +56,7 @@ async def list_products(
     """Lista todos los productos con cantidad. Todos los roles pueden ver."""
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.inventory))
+        .options(selectinload(Product.inventory), selectinload(Product.precios))
         .order_by(Product.name)
     )
     products = result.scalars().all()
@@ -71,6 +71,7 @@ async def list_products(
             is_active=p.is_active,
             created_at=p.created_at,
             quantity=p.inventory.quantity if p.inventory else 0,
+            prices=p.precios,
         )
         for p in products
     ]
@@ -284,7 +285,11 @@ async def toggle_product_active(
     """Activa/desactiva un producto (accountant/admin)."""
     check_edit_permission(current_user)
 
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.precios), selectinload(Product.inventory))
+        .where(Product.id == product_id)
+    )
     product = result.scalar_one_or_none()
 
     if not product:
@@ -292,14 +297,6 @@ async def toggle_product_active(
 
     product.is_active = not product.is_active
     await db.flush()
-    await db.refresh(product)
-
-    result = await db.execute(
-        select(Product)
-        .options(selectinload(Product.precios), selectinload(Product.inventory))
-        .where(Product.id == product_id)
-    )
-    product = result.scalar_one()
 
     return ProductResponse(
         id=product.id,

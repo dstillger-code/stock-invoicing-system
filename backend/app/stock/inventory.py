@@ -115,7 +115,11 @@ async def update_inventory_quantity(
     if current_user.role not in ("accountant", "admin"):
         raise HTTPException(status_code=403, detail="Sin permisos para actualizar inventario")
 
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.inventory))
+        .where(Product.id == product_id)
+    )
     product = result.scalar_one_or_none()
 
     if not product:
@@ -124,19 +128,21 @@ async def update_inventory_quantity(
     if not product.inventory:
         inventory = Inventory(product_id=product_id, quantity=data.quantity)
         db.add(inventory)
+        await db.flush()
+        quantity = data.quantity
     else:
         product.inventory.quantity = data.quantity
+        quantity = data.quantity
 
-    if data.quantity <= 0 and product.is_active:
+    if quantity <= 0 and product.is_active:
         product.is_active = False
 
     await db.flush()
-    await db.refresh(product)
 
     return {
         "product_id": str(product.id),
         "sku": product.sku,
         "name": product.name,
-        "quantity": data.quantity,
+        "quantity": quantity,
         "is_active": product.is_active,
     }

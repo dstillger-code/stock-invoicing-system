@@ -1,5 +1,4 @@
 import { NavLink, Routes, Route } from 'react-router-dom'
-import { StockItemsPage } from './StockItemsPage'
 import { InventoryPage } from './InventoryPage'
 import { ProductsPage } from './ProductsPage'
 
@@ -18,14 +17,6 @@ export function StockLayout() {
             Inventario
           </NavLink>
           <NavLink
-            to="/stock/items"
-            className={({ isActive }) =>
-              isActive ? 'text-blue-600 font-medium' : 'text-slate-600 hover:text-slate-800'
-            }
-          >
-            Ítems
-          </NavLink>
-          <NavLink
             to="/stock/products"
             className={({ isActive }) =>
               isActive ? 'text-blue-600 font-medium' : 'text-slate-600 hover:text-slate-800'
@@ -39,7 +30,6 @@ export function StockLayout() {
         <Routes>
           <Route index element={<InventoryPage />} />
           <Route path="inventory" element={<InventoryPage />} />
-          <Route path="items" element={<StockItemsPage />} />
           <Route path="products" element={<ProductsPage />} />
         </Routes>
       </main>
