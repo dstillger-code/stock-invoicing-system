@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 class ProductPriceBase(BaseModel):
     country_code: str = Field(..., min_length=2, max_length=2)
-    net_price: Decimal = Field(..., ge=0)
-    tax_rate: Decimal = Field(..., ge=0, le=100)
+    net_price: float = Field(..., ge=0)
+    tax_rate: float = Field(..., ge=0, le=100)
     is_exempt: bool = False
 
 
