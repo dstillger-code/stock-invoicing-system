@@ -83,6 +83,7 @@ export function ProductsPage() {
   }, [])
 
   const getProductPrice = (product: Product) => {
+    if (!product.prices || product.prices.length === 0) return null
     return product.prices.find((p) => p.country_code === country) || product.prices[0]
   }
 

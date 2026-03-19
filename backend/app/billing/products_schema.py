@@ -68,6 +68,7 @@ class ProductListResponse(BaseModel):
     is_active: bool
     created_at: datetime | None = None
     quantity: int = 0
+    prices: list[ProductPriceResponse] = []
 
     class Config:
         from_attributes = True
