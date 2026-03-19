@@ -20,6 +20,7 @@ interface AuthState {
   hasPermission: (module: string) => boolean
   isAuthenticated: () => boolean
   isAdmin: () => boolean
+  isAccountant: () => boolean
   mustChangePassword: () => boolean
 }
 
@@ -59,6 +60,11 @@ export const useAuthStore = create<AuthState>()(
       isAdmin: () => {
         const { user } = get()
         return user?.email === 'admin@stock.com'
+      },
+
+      isAccountant: () => {
+        const { user } = get()
+        return user?.role === 'accountant' || user?.email === 'admin@stock.com'
       },
 
       mustChangePassword: () => {

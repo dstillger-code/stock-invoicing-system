@@ -10,6 +10,7 @@ export function AdminLayout() {
       <main>
         <Routes>
           <Route index element={<UsersPage />} />
+          <Route path="users" element={<UsersPage />} />
         </Routes>
       </main>
     </div>

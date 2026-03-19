@@ -1,6 +1,7 @@
 """Router del módulo Inventory (protegido por JWT)."""
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -97,3 +98,45 @@ async def calculate_product_price(
     """Calcula el precio con impuestos. Requiere JWT."""
     result = calculate_total(net_price, country_code, tax_type)
     return result
+
+
+class InventoryUpdate(BaseModel):
+    quantity: int = Field(..., ge=0)
+
+
+@router.patch("/{product_id}")
+async def update_inventory_quantity(
+    product_id: UUID,
+    data: InventoryUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Actualiza la cantidad de inventario de un producto. Auto-desactiva si stock=0."""
+    if current_user.role not in ("accountant", "admin"):
+        raise HTTPException(status_code=403, detail="Sin permisos para actualizar inventario")
+
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    if not product.inventory:
+        inventory = Inventory(product_id=product_id, quantity=data.quantity)
+        db.add(inventory)
+    else:
+        product.inventory.quantity = data.quantity
+
+    if data.quantity <= 0 and product.is_active:
+        product.is_active = False
+
+    await db.flush()
+    await db.refresh(product)
+
+    return {
+        "product_id": str(product.id),
+        "sku": product.sku,
+        "name": product.name,
+        "quantity": data.quantity,
+        "is_active": product.is_active,
+    }

@@ -11,6 +11,7 @@ from app.auth.router import router as auth_router
 from app.stock.router import router as stock_router
 from app.stock.inventory import router as inventory_router
 from app.billing.router import router as billing_router
+from app.billing.products_router import router as products_router
 from app.auth.seed import seed_all
 
 
@@ -60,6 +61,7 @@ app.include_router(auth_router, prefix="/api", tags=["Autenticación"])
 app.include_router(stock_router, prefix="/api", tags=["Stock"])
 app.include_router(inventory_router, prefix="/api", tags=["Inventario"])
 app.include_router(billing_router, prefix="/api", tags=["Facturación"])
+app.include_router(products_router, prefix="/api", tags=["Productos"])
 
 
 @app.get("/", tags=["Root"])

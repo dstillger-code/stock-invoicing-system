@@ -7,6 +7,7 @@ const mockUser: User = {
   full_name: 'Test User',
   role: 'operator',
   allowed_modules: ['stock', 'billing'],
+  password_changed: true,
 }
 
 describe('useAuthStore', () => {
