@@ -13,6 +13,7 @@ from app.billing.products_schema import (
     ProductCreate,
     ProductUpdate,
     ProductPriceUpdate,
+    ProductPriceResponse,
     ProductResponse,
     ProductListResponse,
 )
@@ -71,7 +72,16 @@ async def list_products(
             is_active=p.is_active,
             created_at=p.created_at,
             quantity=p.inventory.quantity if p.inventory else 0,
-            prices=p.precios,
+            prices=[
+                ProductPriceResponse(
+                    id=price.id,
+                    country_code=price.country_code,
+                    net_price=price.net_price,
+                    tax_rate=price.tax_rate,
+                    is_exempt=price.is_exempt,
+                )
+                for price in p.precios
+            ],
         )
         for p in products
     ]
@@ -102,7 +112,16 @@ async def get_product(
         category=product.category,
         is_active=product.is_active,
         created_at=product.created_at,
-        prices=product.precios,
+        prices=[
+            ProductPriceResponse(
+                id=price.id,
+                country_code=price.country_code,
+                net_price=price.net_price,
+                tax_rate=price.tax_rate,
+                is_exempt=price.is_exempt,
+            )
+            for price in product.precios
+        ],
         quantity=product.inventory.quantity if product.inventory else 0,
     )
 
@@ -161,9 +180,18 @@ async def create_product(
         category=product.category,
         is_active=product.is_active,
         created_at=product.created_at,
-        prices=product.precios,
+        prices=[
+            ProductPriceResponse(
+                id=price.id,
+                country_code=price.country_code,
+                net_price=price.net_price,
+                tax_rate=price.tax_rate,
+                is_exempt=price.is_exempt,
+            )
+            for price in product.precios
+        ],
+        quantity=0,
     )
-
 
 @router.patch("/{product_id}", response_model=ProductResponse)
 async def update_product(
@@ -210,7 +238,16 @@ async def update_product(
         category=product.category,
         is_active=product.is_active,
         created_at=product.created_at,
-        prices=product.precios,
+        prices=[
+            ProductPriceResponse(
+                id=price.id,
+                country_code=price.country_code,
+                net_price=price.net_price,
+                tax_rate=price.tax_rate,
+                is_exempt=price.is_exempt,
+            )
+            for price in product.precios
+        ],
         quantity=product.inventory.quantity if product.inventory else 0,
     )
 
@@ -271,7 +308,16 @@ async def update_product_prices(
         category=product.category,
         is_active=product.is_active,
         created_at=product.created_at,
-        prices=product.precios,
+        prices=[
+            ProductPriceResponse(
+                id=price.id,
+                country_code=price.country_code,
+                net_price=price.net_price,
+                tax_rate=price.tax_rate,
+                is_exempt=price.is_exempt,
+            )
+            for price in product.precios
+        ],
         quantity=product.inventory.quantity if product.inventory else 0,
     )
 
@@ -306,7 +352,16 @@ async def toggle_product_active(
         category=product.category,
         is_active=product.is_active,
         created_at=product.created_at,
-        prices=product.precios,
+        prices=[
+            ProductPriceResponse(
+                id=price.id,
+                country_code=price.country_code,
+                net_price=price.net_price,
+                tax_rate=price.tax_rate,
+                is_exempt=price.is_exempt,
+            )
+            for price in product.precios
+        ],
         quantity=product.inventory.quantity if product.inventory else 0,
     )
 
