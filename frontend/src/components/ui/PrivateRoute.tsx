@@ -7,7 +7,7 @@ interface PrivateRouteProps {
 }
 
 export function PrivateRoute({ children, module }: PrivateRouteProps) {
-  const { user, hasPermission, isAuthenticated } = useAuthStore()
+  const { hasPermission, isAuthenticated } = useAuthStore()
   const location = useLocation()
 
   if (!isAuthenticated()) {
