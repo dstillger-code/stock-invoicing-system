@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getAuthHeader, useAuthStore } from '../../store/useAuthStore'
+import { useConfigStore, TAX_RATES } from '../../store/useConfigStore'
 
 interface ProductPrice {
   id: string
@@ -21,46 +22,53 @@ interface Product {
   quantity: number
 }
 
-interface PriceInput {
-  country_code: string
-  net_price: number
-  tax_rate: number
-  is_exempt: boolean
-}
-
-const EMPTY_PRICE: PriceInput = {
-  country_code: 'CL',
-  net_price: 0,
-  tax_rate: 19,
-  is_exempt: false,
-}
-
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [showInventoryModal, setShowInventoryModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const { isAdmin, isAccountant } = useAuthStore()
+  const { country } = useConfigStore()
 
   const canEdit = isAccountant()
   const canDelete = isAdmin()
 
-  const [formData, setFormData] = useState({
+  const countryName = country === 'CL' ? 'Chile' : 'Argentina'
+  const defaultTaxRate = TAX_RATES[country].default
+
+  const [formData, setFormData] = useState<{
+    sku: string
+    name: string
+    description: string
+    category: string
+    net_price: number
+    tax_rate: number
+    is_exempt: boolean
+    quantity: number
+  }>({
     sku: '',
     name: '',
     description: '',
     category: '',
+    net_price: 0,
+    tax_rate: 0,
+    is_exempt: false,
+    quantity: 0,
   })
-  const [priceInputs, setPriceInputs] = useState<PriceInput[]>([])
 
   const fetchProducts = async () => {
     try {
       const response = await fetch('/api/products/', {
         headers: { ...getAuthHeader() },
       })
-      if (!response.ok) throw new Error('Error al cargar productos')
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Error al cargar productos')
+      }
       const data = await response.json()
       setProducts(data)
     } catch (err) {
@@ -74,35 +82,45 @@ export function ProductsPage() {
     fetchProducts()
   }, [])
 
+  const getProductPrice = (product: Product) => {
+    return product.prices.find((p) => p.country_code === country) || product.prices[0]
+  }
+
   const openCreateModal = () => {
     setEditingProduct(null)
-    setFormData({ sku: '', name: '', description: '', category: '' })
-    setPriceInputs([{ ...EMPTY_PRICE }])
+    setFormData({
+      sku: '',
+      name: '',
+      description: '',
+      category: '',
+      net_price: 0,
+      tax_rate: defaultTaxRate,
+      is_exempt: false,
+      quantity: 0,
+    })
     setShowModal(true)
   }
 
   const openEditModal = (product: Product) => {
     setEditingProduct(product)
+    const price = getProductPrice(product)
     setFormData({
       sku: product.sku,
       name: product.name,
       description: product.description || '',
       category: product.category || '',
+      net_price: price?.net_price || 0,
+      tax_rate: price?.tax_rate || defaultTaxRate,
+      is_exempt: price?.is_exempt || false,
+      quantity: product.quantity,
     })
-    const existingCodes = product.prices.map((p) => p.country_code)
-    const merged: PriceInput[] = []
-    if (!existingCodes.includes('CL')) merged.push({ ...EMPTY_PRICE, country_code: 'CL' })
-    if (!existingCodes.includes('AR')) merged.push({ ...EMPTY_PRICE, country_code: 'AR' })
-    setPriceInputs([
-      ...product.prices.map((p) => ({
-        country_code: p.country_code,
-        net_price: p.net_price,
-        tax_rate: p.tax_rate,
-        is_exempt: p.is_exempt,
-      })),
-      ...merged,
-    ])
     setShowModal(true)
+  }
+
+  const openInventoryModal = (product: Product) => {
+    setInventoryProduct(product)
+    setFormData((prev) => ({ ...prev, quantity: product.quantity }))
+    setShowInventoryModal(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,10 +130,18 @@ export function ProductsPage() {
 
     try {
       const body: Record<string, unknown> = {
-        ...formData,
+        sku: formData.sku,
+        name: formData.name,
         description: formData.description || null,
         category: formData.category || null,
-        prices: priceInputs.filter((p) => p.net_price > 0),
+        prices: [
+          {
+            country_code: country,
+            net_price: formData.net_price,
+            tax_rate: formData.tax_rate,
+            is_exempt: formData.is_exempt,
+          },
+        ],
       }
 
       const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products/'
@@ -132,6 +158,16 @@ export function ProductsPage() {
         throw new Error(data.detail || 'Error al guardar producto')
       }
 
+      const savedProduct = await response.json()
+
+      if (formData.quantity > 0) {
+        await fetch(`/api/inventory/${savedProduct.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+          body: JSON.stringify({ quantity: formData.quantity }),
+        })
+      }
+
       setShowModal(false)
       fetchProducts()
     } catch (err) {
@@ -141,8 +177,35 @@ export function ProductsPage() {
     }
   }
 
+  const handleInventorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!inventoryProduct) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/inventory/${inventoryProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ quantity: formData.quantity }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Error al actualizar stock')
+      }
+
+      setShowInventoryModal(false)
+      fetchProducts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDelete = async (productId: string) => {
-    if (!confirm('¿Eliminar este producto?')) return
+    if (!confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')) return
     try {
       const response = await fetch(`/api/products/${productId}`, {
         method: 'DELETE',
@@ -162,11 +225,11 @@ export function ProductsPage() {
     try {
       const response = await fetch(`/api/products/${product.id}/toggle-active`, {
         method: 'PATCH',
-        headers: { ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       })
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.detail || 'Error al actualizar')
+        throw new Error(data.detail || 'Error al cambiar estado')
       }
       fetchProducts()
     } catch (err) {
@@ -185,7 +248,12 @@ export function ProductsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Productos</h2>
+        <div>
+          <h2 className="text-2xl font-bold">Productos</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            País: {countryName} ({country}) · IVA: {defaultTaxRate}%
+          </p>
+        </div>
         {canEdit && (
           <button
             onClick={openCreateModal}
@@ -209,66 +277,94 @@ export function ProductsPage() {
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">SKU</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Nombre</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Categoría</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Stock</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Stock</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Precio ({country})</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Activo</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {products.map((product) => (
-              <tr key={product.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 text-sm font-mono">{product.sku}</td>
-                <td className="px-4 py-3 text-sm font-medium">{product.name}</td>
-                <td className="px-4 py-3 text-sm text-slate-500">{product.category || '-'}</td>
-                <td className="px-4 py-3 text-sm text-center">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    product.quantity === 0 ? 'bg-red-100 text-red-700' :
-                    product.quantity < 10 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {product.quantity}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    product.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {product.is_active ? 'Sí' : 'No'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center space-x-2">
-                  {canEdit && (
-                    <>
+            {products.map((product) => {
+              const price = getProductPrice(product)
+              return (
+                <tr key={product.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-sm font-mono">{product.sku}</td>
+                  <td className="px-4 py-3 text-sm font-medium">{product.name}</td>
+                  <td className="px-4 py-3 text-sm text-slate-500">{product.category || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    {canEdit ? (
                       <button
-                        onClick={() => openEditModal(product)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => toggleActive(product)}
-                        className={`text-sm hover:underline ${
-                          product.is_active ? 'text-red-600' : 'text-green-600'
+                        onClick={() => openInventoryModal(product)}
+                        className={`px-2 py-1 rounded text-xs font-medium cursor-pointer ${
+                          product.quantity === 0
+                            ? 'bg-red-100 text-red-700'
+                            : product.quantity < 10
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
                         }`}
                       >
-                        {product.is_active ? 'Desactivar' : 'Activar'}
+                        {product.quantity}
                       </button>
-                    </>
-                  )}
-                  {canDelete && (
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                    ) : (
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          product.quantity === 0
+                            ? 'bg-red-100 text-red-700'
+                            : product.quantity < 10
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {product.quantity}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    {price ? `$${price.net_price.toFixed(2)}` : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${
+                        product.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}
                     >
-                      Eliminar
-                    </button>
-                  )}
-                  {!canEdit && (
-                    <span className="text-slate-400 text-xs">Solo lectura</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      {product.is_active ? 'Sí' : 'No'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center space-x-2">
+                    {canEdit && (
+                      <>
+                        <button
+                          onClick={() => openEditModal(product)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => toggleActive(product)}
+                          className={`text-sm hover:underline ${
+                            product.is_active ? 'text-orange-600' : 'text-green-600'
+                          }`}
+                        >
+                          {product.is_active ? 'Desactivar' : 'Activar'}
+                        </button>
+                      </>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                    {!canEdit && (
+                      <span className="text-slate-400 text-xs">Solo lectura</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         {products.length === 0 && (
@@ -278,10 +374,15 @@ export function ProductsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">
               {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
             </h3>
+
+            <div className="mb-3 px-3 py-2 bg-slate-100 rounded text-xs text-slate-600">
+              País: <strong>{countryName}</strong> · IVA por defecto: <strong>{defaultTaxRate}%</strong>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">SKU *</label>
@@ -323,83 +424,68 @@ export function ProductsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Precios</label>
-                {priceInputs.map((price, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2 items-center">
-                    <select
-                      value={price.country_code}
-                      onChange={(e) => {
-                        const updated = [...priceInputs]
-                        updated[idx].country_code = e.target.value
-                        setPriceInputs(updated)
-                      }}
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
-                    >
-                      <option value="CL">CL</option>
-                      <option value="AR">AR</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Precio neto"
-                      value={price.net_price || ''}
-                      onChange={(e) => {
-                        const updated = [...priceInputs]
-                        updated[idx].net_price = parseFloat(e.target.value) || 0
-                        setPriceInputs(updated)
-                      }}
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
-                      min={0}
-                      step="0.01"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Tasa %"
-                      value={price.tax_rate || ''}
-                      onChange={(e) => {
-                        const updated = [...priceInputs]
-                        updated[idx].tax_rate = parseFloat(e.target.value) || 0
-                        setPriceInputs(updated)
-                      }}
-                      className="w-20 rounded border border-slate-300 px-2 py-1 text-sm"
-                      min={0}
-                      max={100}
-                      step="0.5"
-                    />
-                    <label className="flex items-center text-xs">
-                      <input
-                        type="checkbox"
-                        checked={price.is_exempt}
-                        onChange={(e) => {
-                          const updated = [...priceInputs]
-                          updated[idx].is_exempt = e.target.checked
-                          setPriceInputs(updated)
-                        }}
-                        className="mr-1"
-                      />
-                      Exento
-                    </label>
-                    {priceInputs.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setPriceInputs(priceInputs.filter((_, i) => i !== idx))}
-                        className="text-red-500 text-sm"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setPriceInputs([...priceInputs, { ...EMPTY_PRICE }])}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  + Agregar precio
-                </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Precio neto ({country})
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.net_price || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, net_price: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full rounded border border-slate-300 px-3 py-2"
+                    min={0}
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Tasa IVA ({country})
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.tax_rate || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, tax_rate: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full rounded border border-slate-300 px-3 py-2"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                  />
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              <div>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_exempt}
+                    onChange={(e) => setFormData({ ...formData, is_exempt: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-slate-700">Producto exento de IVA</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Stock inicial ({country})
+                </label>
+                <input
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full rounded border border-slate-300 px-3 py-2"
+                  min={0}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
@@ -413,6 +499,53 @@ export function ProductsPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                 >
                   {saving ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showInventoryModal && inventoryProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <h3 className="text-lg font-bold mb-1">Actualizar Stock</h3>
+            <p className="text-sm text-slate-500 mb-4">{inventoryProduct.name}</p>
+
+            <form onSubmit={handleInventorySubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Cantidad en stock ({country})
+                </label>
+                <input
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-lg"
+                  min={0}
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Si el stock llega a 0, el producto se desactivar\u00e1 autom\u00e1ticamente.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowInventoryModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Guardando...' : 'Actualizar'}
                 </button>
               </div>
             </form>
