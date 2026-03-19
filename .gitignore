@@ -34,4 +34,5 @@ pgdata/
 
 # Vite
 dist/
-.env*
+.env*package-lock.json
+frontend/package-lock.json
