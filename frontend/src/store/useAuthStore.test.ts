@@ -8,6 +8,7 @@ const mockUser: User = {
   role: 'operator',
   allowed_modules: ['stock', 'billing'],
   password_changed: true,
+  country_code: 'CL',
 }
 
 describe('useAuthStore', () => {

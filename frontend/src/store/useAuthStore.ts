@@ -8,6 +8,7 @@ export interface User {
   role: string
   allowed_modules: string[]
   password_changed: boolean
+  country_code: string
 }
 
 interface AuthState {
@@ -59,12 +60,12 @@ export const useAuthStore = create<AuthState>()(
 
       isAdmin: () => {
         const { user } = get()
-        return user?.email === 'admin@stock.com'
+        return user?.role === 'admin'
       },
 
       isAccountant: () => {
         const { user } = get()
-        return user?.role === 'accountant' || user?.email === 'admin@stock.com'
+        return user?.role === 'accountant' || user?.role === 'admin'
       },
 
       mustChangePassword: () => {

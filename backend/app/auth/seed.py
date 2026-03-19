@@ -8,6 +8,8 @@ from app.billing.model import Country
 from app.auth.model import User
 from app.auth.router import get_password_hash
 
+DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "CL")
+
 
 async def seed_tax_config():
     """Inserta países con sus tasas de IVA por defecto. Idempotente."""
@@ -24,11 +26,15 @@ async def seed_tax_config():
 
 
 async def seed_admin_user():
-    """Crea usuario admin si no existe. Lee contraseña de SECRET_KEY o usa default."""
+    """Crea usuario admin si no existe en el país por defecto."""
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.email == "admin@stock.com"))
+        result = await session.execute(
+            select(User).where(
+                User.email == "admin@stock.com", User.country_code == DEFAULT_COUNTRY
+            )
+        )
         if result.scalar_one_or_none() is not None:
-            print("Usuario admin ya existe, omitiendo seed.")
+            print(f"Usuario admin ya existe en {DEFAULT_COUNTRY}, omitiendo seed.")
             return
 
         admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
@@ -40,10 +46,11 @@ async def seed_admin_user():
             full_name="Administrador",
             role="admin",
             allowed_modules=["stock", "billing"],
+            country_code=DEFAULT_COUNTRY,
         )
         session.add(admin)
         await session.commit()
-        print(f"Seed: usuario admin@stock.com creado (password: {admin_password})")
+        print(f"Seed: usuario admin@stock.com creado en {DEFAULT_COUNTRY} (password: {admin_password})")
 
 
 async def seed_all():

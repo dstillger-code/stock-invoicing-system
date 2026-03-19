@@ -41,16 +41,18 @@ export function Sidebar() {
         </span>
       </div>
 
-      <div className="mb-4 p-3 bg-slate-700 rounded">
-        <p className="text-xs text-slate-400 mb-1">País / Tasa IVA</p>
-        <button
-          onClick={handleCountryToggle}
-          className="flex items-center gap-2 w-full"
-        >
-          <span className="text-lg font-bold">{country}</span>
-          <span className="text-sm text-slate-300">{taxRateName}</span>
-        </button>
-      </div>
+      {isAdmin() && import.meta.env.DEV && (
+        <div className="mb-4 p-3 bg-slate-700 rounded">
+          <p className="text-xs text-slate-400 mb-1">País / Tasa IVA</p>
+          <button
+            onClick={handleCountryToggle}
+            className="flex items-center gap-2 w-full"
+          >
+            <span className="text-lg font-bold">{country}</span>
+            <span className="text-sm text-slate-300">{taxRateName}</span>
+          </button>
+        </div>
+      )}
 
       <nav className="space-y-2 flex-1">
         {navItems.map((item) => {

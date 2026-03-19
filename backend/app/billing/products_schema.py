@@ -1,23 +1,12 @@
 """Esquemas Pydantic para el módulo Products."""
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-class ProductPriceBase(BaseModel):
-    country_code: str = Field(..., min_length=2, max_length=2)
-    net_price: float = Field(..., ge=0)
-    tax_rate: float = Field(..., ge=0, le=100)
-    is_exempt: bool = False
-
-
-class ProductPriceCreate(ProductPriceBase):
-    pass
-
-
-class ProductPriceResponse(ProductPriceBase):
-    id: UUID
+class ProductPriceResponse(BaseModel):
+    id: str
+    net_price: float
 
     class Config:
         from_attributes = True
@@ -31,7 +20,8 @@ class ProductBase(BaseModel):
 
 
 class ProductCreate(ProductBase):
-    prices: list[ProductPriceCreate] = Field(default_factory=list)
+    net_price: float | None = Field(None, ge=0)
+    initial_quantity: int | None = Field(0, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -40,19 +30,15 @@ class ProductUpdate(BaseModel):
     description: str | None = None
     category: str | None = Field(None, max_length=100)
     is_active: bool | None = None
-
-
-class ProductPriceUpdate(BaseModel):
-    country_code: str
-    net_price: Decimal | None = Field(None, ge=0)
-    tax_rate: Decimal | None = Field(None, ge=0, le=100)
-    is_exempt: bool | None = None
+    net_price: float | None = Field(None, ge=0)
 
 
 class ProductResponse(ProductBase):
     id: UUID
     is_active: bool
+    country_code: str
     created_at: datetime | None = None
+    quantity: int = 0
     prices: list[ProductPriceResponse] = []
 
     class Config:
@@ -66,6 +52,7 @@ class ProductListResponse(BaseModel):
     description: str | None
     category: str | None
     is_active: bool
+    country_code: str
     created_at: datetime | None = None
     quantity: int = 0
     prices: list[ProductPriceResponse] = []

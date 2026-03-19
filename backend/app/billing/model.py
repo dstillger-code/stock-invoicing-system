@@ -19,21 +19,23 @@ class Country(Base):
     currency_code = Column(String(3), nullable=True)
     default_tax_rate = Column(Numeric(5, 2), nullable=True)
 
-    precios = relationship("ProductPrice", back_populates="country")
-
 
 class Product(Base):
     """Producto en el catálogo."""
 
     __tablename__ = "products"
-    __table_args__ = {"schema": "business"}
+    __table_args__ = (
+        UniqueConstraint("sku", "country_code", name="uq_product_sku_country"),
+        {"schema": "business"},
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    sku = Column(String(100), unique=True, index=True, nullable=False)
+    sku = Column(String(100), nullable=False)
     name = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     category = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    country_code = Column(String(2), nullable=False, default="CL")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     precios = relationship("ProductPrice", back_populates="product", cascade="all, delete-orphan")
@@ -41,23 +43,16 @@ class Product(Base):
 
 
 class ProductPrice(Base):
-    """Precio por país con configuración de IVA."""
+    """Precio del producto (sin impuesto, el impuesto se calcula en facturación)."""
 
     __tablename__ = "product_prices"
-    __table_args__ = (
-        UniqueConstraint("product_id", "country_code", name="uq_product_country"),
-        {"schema": "business"},
-    )
+    __table_args__ = {"schema": "business"}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("business.products.id", ondelete="CASCADE"), nullable=False)
-    country_code = Column(String(2), ForeignKey("business.countries.code"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("business.products.id", ondelete="CASCADE"), unique=True, nullable=False)
     net_price = Column(Numeric(12, 2), nullable=False)
-    tax_rate = Column(Numeric(5, 2), nullable=False)
-    is_exempt = Column(Boolean, default=False, nullable=False)
 
     product = relationship("Product", back_populates="precios")
-    country = relationship("Country", back_populates="precios")
 
 
 class Inventory(Base):

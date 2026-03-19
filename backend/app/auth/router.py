@@ -45,12 +45,15 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
+        country_code: str = payload.get("country", "CL")
         if email is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.email == email))
+    result = await db.execute(
+        select(User).where(User.email == email, User.country_code == country_code)
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
@@ -59,8 +62,8 @@ async def get_current_user(
     return user
 
 
-async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.email != "admin@stock.com":
+def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo el administrador puede acceder")
     return current_user
 
@@ -72,6 +75,7 @@ class UserCreate(BaseModel):
     role: str = "operator"
     allowed_modules: list[str] = ["stock"]
     expiration_days: int = 30
+    country_code: str = "CL"
 
 
 class UserUpdate(BaseModel):
@@ -91,6 +95,7 @@ class UserResponse(BaseModel):
     allowed_modules: list[str]
     password_changed: bool
     expiration_days: int
+    country_code: str
     created_at: Optional[datetime]
 
     class Config:
@@ -128,6 +133,7 @@ async def login(
             "sub": user.email,
             "role": user.role,
             "allowed_modules": user.allowed_modules or [],
+            "country": user.country_code,
         }
     )
 
@@ -141,6 +147,7 @@ async def login(
             "role": user.role,
             "allowed_modules": user.allowed_modules or [],
             "password_changed": user.password_changed,
+            "country_code": user.country_code,
         },
     }
 
@@ -150,9 +157,13 @@ async def register(
     data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == data.email))
+    result = await db.execute(
+        select(User).where(
+            User.email == data.email, User.country_code == data.country_code
+        )
+    )
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="El email ya está registrado")
+        raise HTTPException(status_code=400, detail="El email ya está registrado en este país")
 
     hashed_password = get_password_hash(data.password)
     new_user = User(
@@ -162,6 +173,7 @@ async def register(
         role=data.role,
         allowed_modules=data.allowed_modules,
         expiration_days=data.expiration_days,
+        country_code=data.country_code,
     )
     db.add(new_user)
     await db.flush()
@@ -172,6 +184,7 @@ async def register(
         "email": new_user.email,
         "full_name": new_user.full_name,
         "role": new_user.role,
+        "country_code": new_user.country_code,
     }
 
 
@@ -201,6 +214,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "allowed_modules": current_user.allowed_modules or [],
         "password_changed": current_user.password_changed,
         "expiration_days": current_user.expiration_days,
+        "country_code": current_user.country_code,
     }
 
 
@@ -227,6 +241,7 @@ class UserAdminResponse(BaseModel):
     allowed_modules: list[str]
     password_changed: bool
     expiration_days: int
+    country_code: str
     created_at: Optional[datetime]
 
     class Config:
@@ -238,8 +253,12 @@ async def list_users(
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lista todos los usuarios (solo admin)."""
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    """Lista usuarios del país del admin (solo admin)."""
+    result = await db.execute(
+        select(User)
+        .where(User.country_code == current_user.country_code)
+        .order_by(User.created_at.desc())
+    )
     users = result.scalars().all()
     return [
         UserAdminResponse(
@@ -251,6 +270,7 @@ async def list_users(
             allowed_modules=u.allowed_modules or [],
             password_changed=u.password_changed,
             expiration_days=u.expiration_days,
+            country_code=u.country_code,
             created_at=u.created_at,
         )
         for u in users
@@ -263,10 +283,14 @@ async def create_user(
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Crea un nuevo usuario (solo admin)."""
-    result = await db.execute(select(User).where(User.email == data.email))
+    """Crea un nuevo usuario en el país del admin (solo admin)."""
+    result = await db.execute(
+        select(User).where(
+            User.email == data.email, User.country_code == current_user.country_code
+        )
+    )
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="El email ya está registrado")
+        raise HTTPException(status_code=400, detail="El email ya está registrado en este país")
 
     hashed_password = get_password_hash(data.password)
     new_user = User(
@@ -276,6 +300,7 @@ async def create_user(
         role=data.role,
         allowed_modules=data.allowed_modules,
         expiration_days=data.expiration_days,
+        country_code=current_user.country_code,
     )
     db.add(new_user)
     await db.flush()
@@ -290,6 +315,7 @@ async def create_user(
         allowed_modules=new_user.allowed_modules or [],
         password_changed=new_user.password_changed,
         expiration_days=new_user.expiration_days,
+        country_code=new_user.country_code,
         created_at=new_user.created_at,
     )
 
@@ -301,8 +327,10 @@ async def update_user(
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Actualiza un usuario (solo admin)."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    """Actualiza un usuario del mismo país (solo admin)."""
+    result = await db.execute(
+        select(User).where(User.id == user_id, User.country_code == current_user.country_code)
+    )
     user = result.scalar_one_or_none()
 
     if not user:
@@ -331,6 +359,7 @@ async def update_user(
         allowed_modules=user.allowed_modules or [],
         password_changed=user.password_changed,
         expiration_days=user.expiration_days,
+        country_code=user.country_code,
         created_at=user.created_at,
     )
 
@@ -341,8 +370,10 @@ async def delete_user(
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Elimina un usuario (solo admin)."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    """Elimina un usuario del mismo país (solo admin)."""
+    result = await db.execute(
+        select(User).where(User.id == user_id, User.country_code == current_user.country_code)
+    )
     user = result.scalar_one_or_none()
 
     if not user:

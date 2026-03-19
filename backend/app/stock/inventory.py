@@ -1,4 +1,4 @@
-"""Router del módulo Inventory (protegido por JWT)."""
+"""Router del módulo Inventory (protegido por JWT, filtrado por país)."""
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -9,10 +9,10 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.auth.router import get_current_user
 from app.auth.model import User
-from app.billing.model import Product, Inventory, ProductPrice, Country
+from app.billing.model import Product, Inventory, ProductPrice
 from app.billing.taxes import calculate_total
 
-router = APIRouter(prefix="/inventory", tags=["Inventory"])
+router = APIRouter(prefix="/inventory", tags=["Inventario"])
 
 
 @router.get("/")
@@ -20,10 +20,11 @@ async def get_inventory(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lista todo el inventario con información de productos. Requiere JWT."""
+    """Lista inventario de productos del país del usuario. Requiere JWT."""
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.inventory), selectinload(Product.precios))
+        .where(Product.country_code == current_user.country_code)
         .order_by(Product.name)
     )
     products = result.scalars().all()
@@ -36,20 +37,13 @@ async def get_inventory(
             "name": product.name,
             "category": product.category,
             "quantity": product.inventory.quantity if product.inventory else 0,
-            "prices": [
-                {
-                    "country_code": p.country_code,
-                    "net_price": float(p.net_price),
-                    "tax_rate": float(p.tax_rate),
-                    "is_exempt": p.is_exempt,
-                }
-                for p in product.precios
-            ],
+            "net_price": float(product.precios[0].net_price) if product.precios else 0,
         }
         inventory_list.append(item)
 
     return {
         "user": current_user.email,
+        "country": current_user.country_code,
         "total_products": len(inventory_list),
         "items": inventory_list,
     }
@@ -61,11 +55,11 @@ async def get_product_inventory(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Obtiene inventario de un producto específico."""
+    """Obtiene inventario de un producto del mismo país."""
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.inventory), selectinload(Product.precios))
-        .where(Product.id == product_id)
+        .where(Product.id == product_id, Product.country_code == current_user.country_code)
     )
     product = result.scalar_one_or_none()
 
@@ -77,26 +71,19 @@ async def get_product_inventory(
         "sku": product.sku,
         "name": product.name,
         "quantity": product.inventory.quantity if product.inventory else 0,
-        "prices": [
-            {
-                "country_code": p.country_code,
-                "net_price": float(p.net_price),
-                "tax_rate": float(p.tax_rate),
-            }
-            for p in product.precios
-        ],
+        "net_price": float(product.precios[0].net_price) if product.precios else 0,
     }
 
 
 @router.post("/calculate")
 async def calculate_product_price(
     net_price: float,
-    country_code: str,
+    country_code: str | None = None,
     tax_type: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
-    """Calcula el precio con impuestos. Requiere JWT."""
-    result = calculate_total(net_price, country_code, tax_type)
+    """Calcula precio con impuestos del país configurado. Requiere JWT."""
+    result = calculate_total(net_price, country_code or current_user.country_code, tax_type)
     return result
 
 
@@ -111,14 +98,14 @@ async def update_inventory_quantity(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Actualiza la cantidad de inventario de un producto. Auto-desactiva si stock=0."""
+    """Actualiza stock de un producto del mismo país. Auto-desactiva si stock=0."""
     if current_user.role not in ("accountant", "admin"):
         raise HTTPException(status_code=403, detail="Sin permisos para actualizar inventario")
 
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.inventory))
-        .where(Product.id == product_id)
+        .where(Product.id == product_id, Product.country_code == current_user.country_code)
     )
     product = result.scalar_one_or_none()
 
