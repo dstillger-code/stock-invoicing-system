@@ -41,6 +41,11 @@ interface InvoiceResponse {
   tax_amount: number
   total: number
   currency: string
+  company_name: string
+  company_tax_id: string | null
+  company_address: string | null
+  company_phone: string | null
+  company_email: string | null
 }
 
 interface TaxRates {
@@ -198,28 +203,50 @@ export function BillingPage() {
     if (!invoice) return
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
-    const countryName = invoice.country_code === 'CL' ? 'Chile' : 'Argentina'
-    const currencyName = invoice.currency === 'CLP' ? 'Peso Chileno' : 'Peso Argentino'
     const docTypeLabel = invoice.document_type === 'factura' ? 'FACTURA' : 'BOLETA'
 
     doc.setFontSize(20)
     doc.setFont('helvetica', 'bold')
-    doc.text(docTypeLabel, pageWidth / 2, 20, { align: 'center' })
+    doc.text(docTypeLabel, pageWidth / 2, 18, { align: 'center' })
 
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
-    doc.text(`N° ${invoice.document_number}`, pageWidth / 2, 28, { align: 'center' })
+    doc.text(`N° ${invoice.document_number}`, pageWidth / 2, 25, { align: 'center' })
 
     doc.setFontSize(10)
     const leftCol = 14
-    doc.text(`País: ${countryName}`, leftCol, 45)
-    doc.text(`Emisor: ${invoice.issuer_name}`, leftCol, 52)
-    doc.text(`Fecha: ${new Date(invoice.issued_at).toLocaleString('es-CL')}`, leftCol, 59)
-    doc.text(`Moneda: ${currencyName} (${invoice.currency})`, leftCol, 66)
-    doc.text(`Tipo IVA: ${invoice.tax_rate}%${invoice.tax_type ? ` (${invoice.tax_type})` : ''}`, leftCol, 73)
+    let y = 36
+
+    doc.setFont('helvetica', 'bold')
+    doc.text(invoice.company_name, leftCol, y)
+    doc.setFont('helvetica', 'normal')
+    y += 5
+    if (invoice.company_address) {
+      doc.text(invoice.company_address, leftCol, y)
+      y += 5
+    }
+    const contactParts = [
+      invoice.company_phone,
+      invoice.company_email,
+      invoice.company_tax_id ? `RUT: ${invoice.company_tax_id}` : null,
+    ].filter(Boolean)
+    if (contactParts.length) {
+      doc.text(contactParts.join('  ·  '), leftCol, y)
+      y += 5
+    }
+
+    y += 4
+    doc.setFontSize(9)
+    doc.text(`Fecha: ${new Date(invoice.issued_at).toLocaleString('es-CL')}`, leftCol, y)
+    y += 5
+    doc.text(`Moneda: ${invoice.currency}`, leftCol, y)
+    y += 5
+    doc.text(`IVA: ${invoice.tax_rate}%${invoice.tax_type ? ` (${invoice.tax_type})` : ''}`, leftCol, y)
+    y += 5
+    doc.text(`Emitido por: ${invoice.issuer_name}`, leftCol, y)
 
     autoTable(doc, {
-      startY: 80,
+      startY: y + 6,
       head: [['Producto / SKU', 'Cantidad', 'P. Unit.', 'Neto', `IVA ${invoice.tax_rate}%`, 'Total']],
       body: invoice.items.map((item) => [
         `${item.name}\n(${item.sku})`,
@@ -344,6 +371,16 @@ export function BillingPage() {
                 {invoice.document_type === 'factura' ? 'FACTURA' : 'BOLETA'}
               </h3>
               <p className="text-sm text-slate-500">N° {invoice.document_number}</p>
+              <p className="font-medium mt-1">{invoice.company_name}</p>
+              {invoice.company_address && (
+                <p className="text-sm text-slate-500">{invoice.company_address}</p>
+              )}
+              {invoice.company_tax_id && (
+                <p className="text-sm text-slate-500">RUT: {invoice.company_tax_id}</p>
+              )}
+              {invoice.company_phone && (
+                <p className="text-sm text-slate-500">{invoice.company_phone}</p>
+              )}
             </div>
             <div className="flex gap-2 flex-wrap print:hidden">
               <button

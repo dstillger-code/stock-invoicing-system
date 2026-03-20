@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { UsersPage } from './UsersPage'
+import { SettingsPage } from './SettingsPage'
 
 export function AdminLayout() {
   return (
@@ -11,6 +12,7 @@ export function AdminLayout() {
         <Routes>
           <Route index element={<UsersPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Routes>
       </main>
     </div>

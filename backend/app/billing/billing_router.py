@@ -12,6 +12,7 @@ from app.auth.router import get_current_user
 from app.auth.model import User
 from app.billing.model import Product, ProductPrice, Inventory
 from app.billing.taxes import calculate_total, IVA_RATES
+from app.business.model import CompanySettings
 
 router = APIRouter(prefix="/billing", tags=["Facturación"])
 
@@ -53,6 +54,11 @@ class InvoiceResponse(BaseModel):
     tax_amount: float
     total: float
     currency: str
+    company_name: str
+    company_tax_id: str | None
+    company_address: str | None
+    company_phone: str | None
+    company_email: str | None
 
 
 _INVOICE_COUNTER: dict[str, int] = {}
@@ -184,6 +190,13 @@ async def create_invoice(
     currency_map = {"CL": "CLP", "AR": "ARS"}
     name_map = {"CL": "Chile", "AR": "Argentina"}
 
+    settings_result = await db.execute(
+        select(CompanySettings).where(
+            CompanySettings.country_code == current_user.country_code
+        )
+    )
+    settings = settings_result.scalar_one_or_none()
+
     return InvoiceResponse(
         document_type=data.document_type,
         document_number=_get_next_number(current_user.country_code),
@@ -198,4 +211,9 @@ async def create_invoice(
         tax_amount=total_tax,
         total=total,
         currency=currency_map.get(current_user.country_code, "USD"),
+        company_name=settings.company_name if settings else "Mi Empresa",
+        company_tax_id=settings.tax_id if settings else None,
+        company_address=settings.address if settings else None,
+        company_phone=settings.phone if settings else None,
+        company_email=settings.email if settings else None,
     )

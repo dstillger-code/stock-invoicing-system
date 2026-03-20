@@ -1,7 +1,9 @@
 """Aplicación FastAPI: Stock y Facturación Multiplataforma."""
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 
 from app.core.config import settings
@@ -13,6 +15,8 @@ from app.stock.inventory import router as inventory_router
 from app.billing.router import router as billing_router
 from app.billing.products_router import router as products_router
 from app.billing.billing_router import router as invoice_router
+from app.business.settings_router import router as settings_router
+from app.business.model import CompanySettings
 from app.auth.seed import seed_all
 
 
@@ -64,6 +68,10 @@ app.include_router(inventory_router, prefix="/api", tags=["Inventario"])
 app.include_router(billing_router, prefix="/api", tags=["Facturación"])
 app.include_router(products_router, prefix="/api", tags=["Productos"])
 app.include_router(invoice_router, prefix="/api", tags=["Facturación"])
+app.include_router(settings_router, prefix="/api", tags=["Configuración"])
+
+os.makedirs("/uploads/logos", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="/uploads"), name="uploads")
 
 
 @app.get("/", tags=["Root"])

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useConfigStore } from '../store/useConfigStore'
 
@@ -16,11 +17,31 @@ const navItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { path: '/admin/users', label: 'Usuarios', adminOnly: true },
+  { path: '/admin/settings', label: 'Configuración', adminOnly: true },
 ]
 
 export function Sidebar() {
-  const { user, hasPermission, isAdmin, logout } = useAuthStore()
+  const { user, hasPermission, isAdmin, logout, token } = useAuthStore()
   const { country, taxRateName, setCountry } = useConfigStore()
+  const [companyName, setCompanyName] = useState('Stock & Facturación')
+
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (!token) return
+      try {
+        const res = await fetch('/api/settings/', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setCompanyName(data.company_name || 'Stock & Facturación')
+        }
+      } catch {
+        // Silently fail, keep default
+      }
+    }
+    fetchCompanyName()
+  }, [token])
 
   const handleCountryToggle = () => {
     setCountry(country === 'CL' ? 'AR' : 'CL')
@@ -34,7 +55,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-slate-800 text-white min-h-screen p-4 flex flex-col">
       <div className="mb-6">
-        <h1 className="text-xl font-bold">Stock & Facturación</h1>
+        <h1 className="text-xl font-bold">{companyName}</h1>
         <p className="text-sm text-slate-400 mt-1">{user?.full_name || user?.email}</p>
         <span className="inline-block mt-1 px-2 py-0.5 bg-slate-700 rounded text-xs">
           {user?.role || 'operator'}
